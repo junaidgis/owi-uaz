@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/plugins/UAZ" >
+        <file>icon.png</file>
+        <file>icons/hec.png</file>
+    </qresource>
+</RCC>
