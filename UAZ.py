@@ -41,6 +41,7 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 from .LayerCheckWorker import LayerChecker
+import time
 
 class UAZ:
     """QGIS Plugin Implementation."""
@@ -373,7 +374,10 @@ class UAZ:
                 continue
             name, interval_value, Num_Intervals, result_fields, layer = self.provideParameters(row)
             iter_worker = Worker(layer, result_fields, parcel_layer, float(interval_value), int(Num_Intervals))
+            current_time = time.time()
             iter_worker.populate_buff()
+            QgsMessageLog.logMessage((str(result_fields)))
+            QgsMessageLog.logMessage((str(time.time() - current_time)))
 
 
     def adjustTableWidget(self, tableWIdget):

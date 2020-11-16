@@ -1,6 +1,8 @@
 import os
 from qgis.core import *
 from PyQt5.QtCore import QVariant
+from qgis.core import QgsSpatialIndex
+from qgis.core import QgsMessageLog
 
 class Worker:
     def __init__(self, layer, att_name, parcels_layer, buffer_int, no_of_int):
@@ -28,26 +30,63 @@ class Worker:
         self.parcels_layer.startEditing()
         self.parcels_layer.dataProvider().addAttributes([QgsField(self.att_name, QVariant.String)])
         self.parcels_layer.updateFields()
+        QgsMessageLog.logMessage('new')
+        base_layer = [feature for feature in self.parcels_layer.getFeatures()]
+        factor_layer = [feature for feature in self.layer.getFeatures()]
         to_transform_parcels = True if self.parcels_layer.crs().postgisSrid() != 3857 else False
         to_transform_olayer = True if self.layer.crs().postgisSrid() != 3857 else False
-        for i in range(self.no_of_int):
+
+        index = QgsSpatialIndex()
+        for poly in base_layer:
+            index.insertFeature(poly)
+
+
+        for i in range(self.no_of_int-1):
             if not i:
-                parameter_val = '<=' + str(self.buffer_int)
+                parameter_val = '<=' + str((self.buffer_int)/1000)
             elif i == self.no_of_int - 1:
-                parameter_val = '>=' + str(self.buffer_int * (self.no_of_int - 1))
+                parameter_val = '>=' + str((self.buffer_int * (self.no_of_int - 1))/1000)
             else:
-                parameter_val = str(self.buffer_int * i) + '-' + str(self.buffer_int * (i + 1))
-            for feat in self.layer.getFeatures():
+                parameter_val = str((self.buffer_int * i)/1000) + '-' + str((self.buffer_int * (i + 1))/1000)
+
+            for feat in factor_layer:
+                fids = []
                 geom = feat.geometry()
-                if to_transform_olayer:
-                    geom = self.transform_geom(geom, self.layer.crs().postgisSrid())
                 parameter_buff = geom.buffer(self.buffer_int * (i + 1), 5)
-                for feat1 in self.parcels_layer.getFeatures():
-                    parcel_geom = feat1.geometry()
-                    if to_transform_parcels:
-                        parcel_geom = self.transform_geom(parcel_geom, self.parcels_layer.crs().postgisSrid())
-                    if parcel_geom.intersects(parameter_buff):
-                        if not feat1[self.att_name]:
-                            feat1[self.att_name] = parameter_val
-                            self.parcels_layer.updateFeature(feat1)
+                for id in index.intersects(parameter_buff.boundingBox()):
+                    fids.append(id)
+               # QgsMessageLog.logMessage(str(i))
+                #QgsMessageLog.logMessage(str(parameter_val))
+                #QgsMessageLog.logMessage(str(self.buffer_int * (i + 1)))
+              #  QgsMessageLog.logMessage(str(len([f for f in self.parcels_layer.getFeatures(request)])))
+                #QgsMessageLog.logMessage(str(fids))
+                #    self.parcels_layer.changeAttributeValue(feat.id(), 2, 30)
+                # assume a list of feature ids returned from index and a QgsVectorLayer 'lyr'
+                request = QgsFeatureRequest()
+                request.setFilterFids(fids)
+                features = self.parcels_layer.getFeatures(request)
+
+                # can now iterate and do fun stuff:
+                #for feat in factor_layer:
+                 #   geom = feat.geometry()
+                 #   parameter_buff = geom.buffer(self.buffer_int * (i + 1), 5)
+                for feature in features:
+                    if feature.geometry().intersects(parameter_buff):
+                        if not feature[self.att_name]:
+                            feature[self.att_name] = parameter_val
+                            self.parcels_layer.updateFeature(feature)
+
+        parameter_val = '>=' + str((self.buffer_int * (self.no_of_int - 1))/1000)
+        for feature in self.parcels_layer.getFeatures():
+            if not feature[self.att_name]:
+                feature[self.att_name] = parameter_val
+                self.parcels_layer.updateFeature(feature)
         self.parcels_layer.commitChanges()
+
+ #                   QgsMessageLog.logMessage(str(feature))
+
+
+
+
+
+
